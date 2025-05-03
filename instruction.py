@@ -486,6 +486,7 @@ class Immediate8(Immediate):
 class Suffix(Encoder):
     modrm: Optional[ModRM]
     sib: Optional[ScaleIndexBase]
+    reg: Optional[byte]
     displacement: Optional[Displacement]
     immediate: Optional[Immediate]
     _3dnow_opcode: Optional[byte]
