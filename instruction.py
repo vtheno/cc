@@ -35,6 +35,7 @@ class LegacyPrefix(Encoder):
         super().__init__()
 
     def encode(self):
+        self.content = bytearray([])
         for data in self.data_bytes:
             self._push(data)
 
@@ -83,6 +84,7 @@ class EscapeSequence(Encoder):
         raise NotImplementedError
 
     def encode(self):
+        self.content = bytearray([])
         for data in self.data_bytes:
             self._push(data)
 
@@ -125,7 +127,7 @@ class EscapeSequence3(EscapeSequence):
 # endregion
 
 
-class InstructionPrefix(Encoder):
+class Prefix(Encoder):
     legacy_prefixs: Optional[LegacyPrefix] = None
     prefix: Optional[byte] = None
     escape_sequence: Optional[EscapeSequence] = None
@@ -142,6 +144,7 @@ class InstructionPrefix(Encoder):
         self.escape_sequence = escape_sequence
 
     def encode(self):
+        self.content = bytearray([])
         if self.legacy_prefixs is not None:
             self.legacy_prefixs.encode()
             self.extend(self.legacy_prefixs)
@@ -153,7 +156,7 @@ class InstructionPrefix(Encoder):
 
 
 # region rex,vex,xop prefix
-class InstructionPrefixRex(InstructionPrefix):
+class PrefixRex(Prefix):
     w: bool
     r: bool
     x: bool
@@ -167,6 +170,7 @@ class InstructionPrefixRex(InstructionPrefix):
         self.b = b
 
     def encode(self):
+        self.content = bytearray([])
         super().encode()
         w = 0b1 if self.w else 0b0
         r = 0b1 if self.r else 0b0
@@ -190,6 +194,7 @@ class RvvvvLpp(Encoder):
         self.pp = pp
 
     def encode(self):
+        self.content = bytearray([])
         r = 0b1 & self.r
         vvvv = 0b1111 & self.vvvv
         L = 0b1 & self.L
@@ -212,6 +217,7 @@ class WvvvvLpp(Encoder):
         self.pp = pp
 
     def encode(self):
+        self.content = bytearray([])
         w = 0b1 & self.w
         vvvv = 0x1111 & self.vvvv
         L = 0b1 & self.L
@@ -234,6 +240,7 @@ class RxbMapSelect(Encoder):
         self.map_select = map_select
 
     def encode(self):
+        self.content = bytearray([])
         r = 0b1 & self.r
         x = 0b1 & self.x
         b = 0b1 & self.b
@@ -242,7 +249,7 @@ class RxbMapSelect(Encoder):
         self._push(data)
 
 
-class InstructionPrefixVex1(InstructionPrefix):
+class PrefixVex1(Prefix):
     r_vvvv_l_pp: RvvvvLpp
 
     def __init__(self, r_vvvv_l_pp: RvvvvLpp, **kwds):
@@ -250,12 +257,13 @@ class InstructionPrefixVex1(InstructionPrefix):
         self.r_vvvv_l_pp = r_vvvv_l_pp
 
     def encode(self):
+        self.content = bytearray([])
         super().encode()
         self.r_vvvv_l_pp.encode()
         self.extend(self.r_vvvv_l_pp)
 
 
-class InstructionPrefixVex2(InstructionPrefix):
+class PrefixVex2(Prefix):
     rxb_map_select: RxbMapSelect
     w_vvvv_l_pp: WvvvvLpp
 
@@ -265,6 +273,7 @@ class InstructionPrefixVex2(InstructionPrefix):
         self.w_vvvv_l_pp = w_vvvv_l_pp
 
     def encode(self):
+        self.content = bytearray([])
         super().encode()
         self.rxb_map_select.encode()
         self.w_vvvv_l_pp.encode()
@@ -272,7 +281,7 @@ class InstructionPrefixVex2(InstructionPrefix):
         self.extend(self.w_vvvv_l_pp)
 
 
-class InstructionPrefixXop(InstructionPrefix):
+class PrefixXop(Prefix):
     rxb_map_select: RxbMapSelect
     w_vvvv_l_pp: WvvvvLpp
 
@@ -282,6 +291,7 @@ class InstructionPrefixXop(InstructionPrefix):
         self.w_vvvv_l_pp = w_vvvv_l_pp
 
     def encode(self):
+        self.content = bytearray([])
         super().encode()
         self.rxb_map_select.encode()
         self.w_vvvv_l_pp.encode()
@@ -305,6 +315,7 @@ class ModRM(Encoder):
         self.rm = rm
 
     def encode(self):
+        self.content = bytearray([])
         mod = 0b11 & self.mod
         reg = 0b111 & self.reg
         rm = 0b111 & self.rm
@@ -324,6 +335,7 @@ class ScaleIndexBase(Encoder):
         self.base = base
 
     def encode(self):
+        self.content = bytearray([])
         scale = 0b11 & self.scale
         index = 0b111 & self.index
         base = 0b111 & self.base
@@ -334,7 +346,7 @@ class ScaleIndexBase(Encoder):
 # endregion
 
 
-class InstructionInfix(Encoder):
+class Infix(Encoder):
     opcode: byte
 
     def __init__(self, opcode: byte):
@@ -342,6 +354,7 @@ class InstructionInfix(Encoder):
         self.opcode = opcode
 
     def encode(self):
+        self.content = bytearray([])
         self._push(self.opcode)
 
 
@@ -353,6 +366,7 @@ class Displacement(Encoder):
         super().__init__()
 
     def encode(self):
+        self.content = bytearray([])
         for data in self.data_bytes:
             self._push(data)
 
@@ -406,6 +420,7 @@ class Immediate(Encoder):
         super().__init__()
 
     def encode(self):
+        self.content = bytearray([])
         for data in self.data_bytes:
             self._push(data)
 
@@ -468,7 +483,7 @@ class Immediate8(Immediate):
 # endregion
 
 
-class InstructionSuffix(Encoder):
+class Suffix(Encoder):
     modrm: Optional[ModRM]
     sib: Optional[ScaleIndexBase]
     displacement: Optional[Displacement]
@@ -491,6 +506,7 @@ class InstructionSuffix(Encoder):
         self._3dnow_opcode = _3dnow_opcode
 
     def encode(self):
+        self.content = bytearray([])
         if self.modrm is not None:
             self.modrm.encode()
             self.extend(self.modrm)
@@ -508,15 +524,15 @@ class InstructionSuffix(Encoder):
 
 
 class Instruction(Encoder):
-    prefix: InstructionPrefix
-    infix: InstructionInfix
-    suffix: InstructionSuffix
+    infix: Infix
+    prefix: Optional[Prefix]
+    suffix: Optional[Suffix]
 
     def __init__(
         self,
-        prefix: InstructionPrefix,
-        infix: InstructionInfix,
-        suffix: InstructionSuffix,
+        infix: Infix,
+        prefix: Optional[Prefix] = None,
+        suffix: Optional[Suffix] = None,
     ):
         super().__init__()
         self.prefix = prefix
@@ -524,12 +540,19 @@ class Instruction(Encoder):
         self.suffix = suffix
 
     def encode(self):
-        self.prefix.encode()
+        self.content = bytearray([])
+        if self.prefix is not None:
+            self.prefix.encode()
+            self.extend(self.prefix)
         self.infix.encode()
-        self.suffix.encode()
-        self.extend(self.prefix)
         self.extend(self.infix)
-        self.extend(self.suffix)
+        if self.suffix is not None:
+            self.suffix.encode()
+            self.extend(self.suffix)
 
-    def dump(self) -> str:
+    def code(self) -> bytearray:
+        self.encode()
+        return self.content
+
+    def __repr__(self) -> str:
         return " ".join(["{:02X}".format(i) for i in self.content])
