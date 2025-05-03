@@ -1,3 +1,4 @@
+from typing import Literal
 from instruction import *
 import registers as regs
 
@@ -24,6 +25,52 @@ class Assembler:
         for inst in self.instructions:
             content.extend(inst.code())
         return content
+
+
+Factor = Literal[1] | Literal[2] | Literal[4] | Literal[8]
+
+
+class Argument:
+
+    def __init__(
+        self,
+        reg: Optional[byte] = None,
+        modrm: Optional[ModRM] = None,
+        sib: Optional[ScaleIndexBase] = None,
+        imm: Optional[int] = None,
+        n_of_imm: Optional[Factor] = None,
+        disp: Optional[int] = None,
+        n_of_disp: Optional[Factor] = None,
+        _3dnow_opcode: Optional[byte] = None,
+    ) -> None:
+        self.reg = reg
+        self.modrm = modrm
+        self.sib = sib
+        self.imm = imm
+        self.n_of_imm = n_of_imm
+        self.disp = disp
+        self.n_of_disp = n_of_disp
+        self._3dnow_opcode = _3dnow_opcode
+
+    def build_immediate(self) -> Immediate:
+        assert self.imm is not None and self.n_of_imm is not None
+        Imm = {1: Immediate1, 2: Immediate2, 4: Immediate4, 8: Immediate8}
+        return Imm[self.n_of_imm](*pack(self.imm))
+
+    def build_displacement(self) -> Displacement:
+        assert self.imm is not None and self.n_of_imm is not None
+        Disp = {1: Displacement1, 2: Displacement2, 4: Displacement4, 8: Displacement8}
+        return Disp[self.n_of_imm](*pack(self.imm))
+
+    def build(self):
+        suffix = Suffix(
+            modrm=self.modrm,
+            sib=self.sib,
+            displacement=self.build_displacement(),
+            immediate=self.build_immediate(),
+            _3dnow_opcode=self._3dnow_opcode,
+        )
+        return suffix
 
 
 class ReturnAssembler(Assembler):
@@ -66,12 +113,56 @@ class NopAssembler(Assembler):
 
 
 class MovAssembler(Assembler):
+    def mov_mem32_indirect_imm32(
+        self, rm: int, imm: int, sib: Optional[ScaleIndexBase] = None
+    ):
+        x = False
+        b = bool((rm & 0b1000) >> 3)
+        if rm == 0b0100 and sib is not None:
+            x = bool((sib.index & 0b1000) >> 3)
+            b = bool((sib.base & 0b1000) >> 3)
+        print(x, b)
+        prefix = PrefixRex(
+            w=False,
+            r=False,
+            x=x,
+            b=b,
+        )
+        infix = Infix(0xC7)
+        modrm = ModRM(0b00, 0b000, rm)
+        imm4 = Immediate4(*pack(imm, n_bytes=4))
+        suffix = Suffix(modrm=modrm, sib=sib if rm == 0b0100 else None, immediate=imm4)
+        inst = Instruction(prefix=prefix, infix=infix, suffix=suffix)
+        self._push(inst)
+
+    def mov_mem16_indirect_imm16(
+        self, rm: int, imm: int, sib: Optional[ScaleIndexBase] = None
+    ):
+        x = False
+        b = bool((rm & 0b1000) >> 3)
+        if rm == 0b0100 and sib is not None:
+            x = bool((sib.index & 0b1000) >> 3)
+            b = bool((sib.base & 0b1000) >> 3)
+        print(x, b)
+        prefix = PrefixRex(
+            w=False,
+            r=False,
+            x=x,
+            b=b,
+            legacy_prefixs=LegacyPrefix2(0x67, 0x66),
+        )
+        infix = Infix(0xC7)
+        modrm = ModRM(0b00, 0b000, rm)
+        imm2 = Immediate2(*pack(imm, n_bytes=2))
+        suffix = Suffix(modrm=modrm, sib=sib if rm == 0b0100 else None, immediate=imm2)
+        inst = Instruction(prefix=prefix, infix=infix, suffix=suffix)
+        self._push(inst)
+
     def mov_mem8_indirect_imm8(
         self, rm: int, imm: int, sib: Optional[ScaleIndexBase] = None
     ):
-
         x = False
-        b = False
+        b = bool((rm & 0b1000) >> 3)
         if rm == 0b0100 and sib is not None:
             x = bool((sib.index & 0b1000) >> 3)
             b = bool((sib.base & 0b1000) >> 3)
@@ -97,7 +188,7 @@ class MovAssembler(Assembler):
         self, rm: int, imm: int, disp: int, sib: Optional[ScaleIndexBase] = None
     ):
         x = False
-        b = False
+        b = bool((rm & 0b1000) >> 3)
         if rm == 0b0100 and sib is not None:
             x = bool((sib.index & 0b1000) >> 3)
             b = bool((sib.base & 0b1000) >> 3)
@@ -120,7 +211,7 @@ class MovAssembler(Assembler):
         self, rm: int, imm: int, disp: int, sib: Optional[ScaleIndexBase] = None
     ):
         x = False
-        b = False
+        b = bool((rm & 0b1000) >> 3)
         if rm == 0b0100 and sib is not None:
             x = bool((sib.index & 0b1000) >> 3)
             b = bool((sib.base & 0b1000) >> 3)
@@ -230,8 +321,11 @@ class MovAssembler(Assembler):
         self._push(inst)
 
     def mov_reg8_imm8(self, reg: int, imm: int):
+        lflag = bool((0b0001_0000 & reg) >> 4)
         flag = bool((0b0000_1000 & reg) >> 3)
-        prefix = PrefixRex(w=False, r=False, x=False, b=flag)
+        prefix = None
+        if lflag or flag:
+            prefix = PrefixRex(w=False, r=False, x=False, b=flag)
         infix = Infix(0xB0 | (0b0000_0111 & reg))
         imm1 = Immediate1(*pack(imm, n_bytes=1))
         suffix = Suffix(immediate=imm1)
@@ -328,11 +422,24 @@ mov_assembler.mov_mem8_disp4_imm8(regs.R8, imm=0xFF, disp=0x11223344)
 mov_assembler.mov_mem8_disp4_imm8(
     0b0100, imm=0xFF, disp=0x11223344, sib=ScaleIndexBase(0b11, regs.R9, regs.R10)
 )
+mov_assembler.mov_mem16_indirect_imm16(regs.R8D, 0x1122)
+mov_assembler.mov_mem16_indirect_imm16(
+    0b0100, 0x1122, sib=ScaleIndexBase(0b11, regs.R9, regs.R10)
+)
+mov_assembler.mov_mem32_indirect_imm32(regs.R8W, 0x11223344)
+mov_assembler.mov_mem32_indirect_imm32(
+    0b0100, 0x11223344, sib=ScaleIndexBase(0b11, regs.R9W, regs.R10W)
+)
 """
 
 
 mov_assembler = MovAssembler()
 
+mov_assembler.mov_reg8_imm8(regs.AL, 0x22)
+mov_assembler.mov_reg8_imm8(regs.AH, 0x22)
+mov_assembler.mov_reg8_imm8(regs.SPL, 0x22)
+mov_assembler.mov_reg8_imm8(regs.R8B, 0x22)
+mov_assembler.mov_reg8_imm8(regs.R12B, 0x22)
 code = mov_assembler.emit()
 print(dump2hex(code))
 with open("test.bin", "wb") as f:

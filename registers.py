@@ -1,11 +1,15 @@
-RAX = R0 = EAX = AX = AH = AL = 0b0000
-RCX = R1 = ECX = CX = CH = CL = 0b0001
-RDX = R2 = EDX = DX = DH = DL = 0b0010
-RBX = R3 = EBX = BX = BH = BL = 0b0011
-RSP = R4 = ESP = SP = SPL = 0b0100
-RBP = R5 = EBP = BP = BPL = 0b0101
-RSI = R6 = ESI = SI = SIL = 0b0110
-RDI = R7 = EDI = DI = DIL = 0b0111
+RAX = R0 = EAX = AX = AL = 0b0000
+RCX = R1 = ECX = CX = CL = 0b0001
+RDX = R2 = EDX = DX = DL = 0b0010
+RBX = R3 = EBX = BX = BL = 0b0011
+RSP = R4 = ESP = SP = AH = 0b0100
+RBP = R5 = EBP = BP = CH = 0b0101
+RSI = R6 = ESI = SI = DH = 0b0110
+RDI = R7 = EDI = DI = BH = 0b0111
+SPL = 0b10100
+BPL = 0b10101
+SIL = 0b10110
+DIL = 0b10111
 R8 = R8D = R8W = R8B = 0b1000
 R9 = R9D = R9W = R9B = 0b1001
 R10 = R10D = R10W = R10B = 0b1010
